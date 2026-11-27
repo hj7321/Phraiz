@@ -1,0 +1,295 @@
+"use client";
+
+import { Suspense, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/auth.store";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, Check, Users, Zap, Crown, BookOpen, Star } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { ServicePlan } from "@/types/payment.type";
+import { PLAN_ID_MAPPING } from "@/types/payment.type";
+import FreeBetaButton from "@/components/payment/FreeBetaButton";
+
+const SERVICE_PLANS: Record<string, ServicePlan> = {
+  basic: {
+    id: "basic",
+    name: "Phraiz Basic",
+    description: "대학생, 일반 사용자를 위한 기본 AI 문장 변환",
+    monthlyPrice: 4900,
+    yearlyPrice: 49000,
+    features: ["AI 패러프레이징 (기본/학술적/창의적 모드)", "사용자 커스텀 모드", "AI 요약 (한 줄, 핵심 문장/단락, 질문 기반)", "자동 인용 생성 (모든 형식)", "히스토리 폴더 기능", "무제한 저장", "월 2,900,000 토큰"]
+  },
+  standard: {
+    id: "standard",
+    name: "Phraiz Standard",
+    description: "대학원생, 파워 유저를 위한 고급 AI 서비스",
+    monthlyPrice: 9900,
+    yearlyPrice: 99000,
+    features: ["모든 Basic 기능 포함", "AI 패러프레이징 (모든 모드)", "고급 AI 요약 기능", "자동 인용 생성 (전체 형식 지원)", "히스토리 폴더 기능", "무제한 저장", "월 6,800,000 토큰", "우선 지원"]
+  },
+  pro: {
+    id: "pro",
+    name: "Phraiz Pro",
+    description: "연구자, 전문가, 팀을 위한 프리미엄 서비스",
+    monthlyPrice: 12900,
+    yearlyPrice: 119000,
+    features: ["모든 Standard 기능 포함", "무제한 토큰 (공정 사용 정책)", "모든 AI 패러프레이징 모드", "고급 AI 요약 (질문 기반/타겟 요약)", "자동 인용 생성 (모든 형식)", "히스토리 폴더 기능", "무제한 저장", "전담 지원", "팀 협업 기능"]
+  }
+};
+
+const getPlanIcon = (planId: string) => {
+  const icons = {
+    basic: <Users className="h-5 w-5" />,
+    standard: <Zap className="h-5 w-5" />,
+    pro: <Crown className="h-5 w-5" />
+  };
+  return icons[planId as keyof typeof icons] || <BookOpen className="h-5 w-5" />;
+};
+
+const getPlanColors = (planId: string, isSelected: boolean) => {
+  if (isSelected) {
+    const selectedColors = {
+      basic: "border-blue-500 bg-blue-50",
+      standard: "border-purple-500 bg-purple-50",
+      pro: "border-yellow-500 bg-yellow-50"
+    };
+    return selectedColors[planId as keyof typeof selectedColors] || "border-gray-500 bg-gray-50";
+  }
+  return "border-gray-200 hover:border-gray-300";
+};
+
+const getBadgeColor = (planId: string) => {
+  const colors = {
+    basic: "bg-blue-100 text-blue-800",
+    standard: "bg-purple-100 text-purple-800",
+    pro: "bg-yellow-100 text-yellow-800"
+  };
+  return colors[planId as keyof typeof colors] || "bg-gray-100 text-gray-800";
+};
+
+function PayPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const isLogin = useAuthStore((state) => state.isLogin);
+
+  const initialPlanId = searchParams.get("plan") || "standard";
+  const [selectedPlanId, setSelectedPlanId] = useState(initialPlanId);
+  const selectedPlan = SERVICE_PLANS[selectedPlanId];
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
+
+  const calculateSavings = (plan: ServicePlan) => {
+    const monthlyTotal = plan.monthlyPrice * 12;
+    const yearlyTotal = plan.yearlyPrice;
+    const savings = monthlyTotal - yearlyTotal;
+    const discountPercent = Math.round((savings / monthlyTotal) * 100);
+    return { savings, discountPercent };
+  };
+
+  if (!isLogin) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            로그인이 필요합니다.{" "}
+            <button onClick={() => router.push("/login")} className="underline font-semibold hover:text-red-800">
+              로그인하기
+            </button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Phraiz AI 구독하기</h1>
+        <p className="text-gray-600">완벽한 AI 문장변환 서비스를 선택하세요</p>
+      </div>
+
+      {/* 요금제 비교 섹션 */}
+      <div className="mb-8">
+        <div className="flex justify-center mb-6">
+          <RadioGroup value={billingCycle} onValueChange={(value: "monthly" | "yearly") => setBillingCycle(value)} className="flex bg-gray-100 p-1 rounded-lg">
+            <div className="flex items-center space-x-2 px-4 py-2">
+              <RadioGroupItem value="monthly" id="monthly-toggle" />
+              <Label htmlFor="monthly-toggle" className="cursor-pointer">
+                월간
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 px-4 py-2">
+              <RadioGroupItem value="yearly" id="yearly-toggle" />
+              <Label htmlFor="yearly-toggle" className="cursor-pointer flex items-center gap-2">
+                연간{" "}
+                <Badge variant="destructive" className="text-xs">
+                  17% 할인
+                </Badge>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {Object.values(SERVICE_PLANS).map((plan) => {
+            const isSelected = selectedPlanId === plan.id;
+            const { discountPercent } = calculateSavings(plan);
+            console.log(discountPercent);
+            const isPopular = plan.id === "standard";
+
+            return (
+              <Card key={plan.id} className={`relative cursor-pointer transition-all ${getPlanColors(plan.id, isSelected)} ${isSelected ? "ring-2 ring-offset-2 ring-blue-500" : ""}`} onClick={() => setSelectedPlanId(plan.id)}>
+                {isPopular && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <Badge className="bg-gradient-to-r from-purple-500 to-blue-600 text-white px-3 py-1">
+                      <Star className="h-3 w-3 mr-1" />
+                      인기
+                    </Badge>
+                  </div>
+                )}
+
+                <CardHeader className="text-center pb-2">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    {getPlanIcon(plan.id)}
+                    <CardTitle className="text-xl">{plan.name}</CardTitle>
+                  </div>
+                  <CardDescription className="text-sm">{plan.description}</CardDescription>
+
+                  <div className="mt-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <span className="text-lg text-red-500 line-through">₩{(plan.monthlyPrice * (billingCycle === "monthly" ? 1 : 12)).toLocaleString()}</span>
+                      <Badge className="bg-blue-100 text-blue-700 text-xs">🎉 베타 무료</Badge>
+                    </div>
+                    <div>
+                      <span className="text-3xl font-bold">₩0</span>
+                      <span className="text-gray-500">/{billingCycle === "monthly" ? "월" : "년"}</span>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  <ul className="space-y-2">
+                    {plan.features.slice(0, 5).map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                    {plan.features.length > 5 && <li className="text-sm text-gray-500 ml-6">+{plan.features.length - 5}개 추가 기능</li>}
+                  </ul>
+
+                  <Button variant={isSelected ? "default" : "outline"} className="w-full mt-4" onClick={() => setSelectedPlanId(plan.id)}>
+                    {isSelected ? "선택됨" : "선택하기"}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto">
+        {/* 주문 요약 */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {getPlanIcon(selectedPlanId)}
+              주문 요약
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="font-medium">{selectedPlan.name}</span>
+                <Badge className={getBadgeColor(selectedPlanId) + " ml-2"}>{selectedPlanId.toUpperCase()}</Badge>
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <span>{billingCycle === "monthly" ? "월간 구독" : "연간 구독"}</span>
+              <span className="line-through text-red-500">₩{(billingCycle === "monthly" ? selectedPlan.monthlyPrice : selectedPlan.yearlyPrice).toLocaleString()}</span>
+            </div>
+
+            <Separator />
+
+            <div className="flex justify-between font-semibold text-lg items-center">
+              <span>총 결제 금액</span>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl text-blue-600">₩0</span>
+                <span className="text-sm text-blue-500">🎉 베타 기간 무료</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-blue-600 text-center font-medium">✨ 베타 기간 동안 모든 플랜을 무료로 이용할 수 있습니다!</p>
+          </CardContent>
+        </Card>
+
+        {/* 베타 무료 활성화 버튼 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>플랜 활성화</CardTitle>
+            <CardDescription>베타 기간 동안 결제 정보 없이 바로 시작할 수 있습니다</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FreeBetaButton planId={PLAN_ID_MAPPING[selectedPlanId as keyof typeof PLAN_ID_MAPPING]} planName={selectedPlan.name} billingCycle={billingCycle} />
+          </CardContent>
+        </Card>
+
+        {/* 보안 및 정책 */}
+        <div className="text-xs text-gray-500 space-y-2 mt-6">
+          <div className="flex items-center justify-center gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-1">
+              <span>🎉</span>
+              <span>베타 무료 체험</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span>✅</span>
+              <span>결제 정보 불필요</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span>🔄</span>
+              <span>언제든 플랜 변경 가능</span>
+            </div>
+          </div>
+          <p className="text-center">
+            서비스 이용 시{" "}
+            <a href="/terms" className="underline hover:text-gray-700">
+              이용약관
+            </a>{" "}
+            및{" "}
+            <a href="/privacy" className="underline hover:text-gray-700">
+              개인정보처리방침
+            </a>
+            에 동의한 것으로 간주됩니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PayPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8 max-w-6xl">
+          <div className="animate-pulse space-y-8">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mx-auto"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-96 bg-gray-200 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      }>
+      <PayPageContent />
+    </Suspense>
+  );
+}

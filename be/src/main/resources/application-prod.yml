@@ -1,0 +1,39 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${PROD_DB_URL}
+    username: ${PROD_DB_USERNAME}
+    password: ${PROD_DB_PASSWORD}
+    # HikariCP 커넥션 풀 최적화 (GPT API 호출로 인한 starvation 방지)
+    hikari:
+      maximum-pool-size: 30           # 10 → 30으로 증가 (동시 요청 처리 능력 향상)
+      minimum-idle: 5                 # 최소 유휴 커넥션
+      connection-timeout: 30000       # 30초 - 커넥션 획듥 타임아웃
+      idle-timeout: 600000            # 10분 - 유휴 커넥션 유지 시간
+      max-lifetime: 1800000           # 30분 - 커넥션 최대 생명 주기
+      leak-detection-threshold: 60000 # 60초 - 커넥션 누수 감지 (로그 출력)
+
+#  redis:
+#    host: ${REDIS_HOST}
+#    port: 6379
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # prod에서는 create/update 절대 금지!
+    show-sql: false
+    # [Claude 제안] Hibernate 배치 처리 최적화
+    # properties:
+    #   hibernate:
+    #     jdbc:
+    #       batch_size: 20
+    #     order_inserts: true
+    #     order_updates: true
+
+logging:
+  level:
+    root: WARN
+    com.phraiz.back: ERROR
+    # HikariCP 로그 레벨 - 커넥션 풀 모니터링
+    com.zaxxer.hikari: INFO  # 커넥션 풀 상태 확인 (필요시 DEBUG로 변경)

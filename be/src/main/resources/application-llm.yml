@@ -1,0 +1,11 @@
+phraiz:
+  llm:
+    # LiteLLM Proxy(로컬) 또는 OpenRouter(운영) 등 OpenAI 호환 게이트웨이 주소
+    base-url: ${LLM_GATEWAY_BASE_URL:http://localhost:4000/v1}
+    api-key: ${LLM_GATEWAY_API_KEY:sk-phraiz-local-master-key}
+    timeout-seconds: 90
+    models:
+      paraphrase: ${LLM_MODEL_PARAPHRASE:paraphrase-default}
+      paraphrase-fast: ${LLM_MODEL_PARAPHRASE_FAST:paraphrase-fast}
+      summary: ${LLM_MODEL_SUMMARY:summary-pdf}
+      cite-fallback: ${LLM_MODEL_CITE_FALLBACK:cite-fallback}

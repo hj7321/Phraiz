@@ -1,0 +1,73 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: phraiz-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-phraiz_root_pw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-phraiz}
+      MYSQL_USER: ${MYSQL_USER:-phraiz_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-phraiz_pw}
+      TZ: Asia/Seoul
+    ports:
+      - "3307:3306"
+    volumes:
+      - phraiz_mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD:-phraiz_root_pw}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: phraiz-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - phraiz_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  translation-server:
+    build: ./be/translation-server
+    container_name: phraiz-zotero
+    restart: unless-stopped
+    ports:
+      - "${ZOTERO_PORT:-1969}:1969"
+
+  litellm:
+    build: ./litellm
+    container_name: phraiz-litellm
+    restart: unless-stopped
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-phraiz-local-master-key}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+
+volumes:
+  phraiz_mysql_data:
+  phraiz_redis_data:

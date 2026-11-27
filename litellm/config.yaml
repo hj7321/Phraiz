@@ -1,0 +1,44 @@
+# Phraiz 기능별 멀티 LLM 라우팅 설정 (LiteLLM Proxy + Langfuse 관측성)
+# 모델 버전이 업데이트되면 이 파일의 model 값만 변경하면 백엔드 재배포 없이 반영됩니다.
+
+model_list:
+  # 1. 학술/문체 패러프레이징 주력 모델 (한국어 자연스러움 우선)
+  - model_name: paraphrase-default
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # 2. 무료 티어 및 단순 유창성 교정용 고속 경량 모델
+  - model_name: paraphrase-fast
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # 3. 장문 및 PDF 요약 특화 모델 (긴 컨텍스트 + 멀티모달)
+  - model_name: summary-pdf
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # 4. 인용 메타데이터 추출 폴백 (Structured Outputs JSON 스키마 강제)
+  - model_name: cite-fallback
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 60
+  fallbacks:
+    - paraphrase-default: ["paraphrase-fast"]
+    - summary-pdf: ["paraphrase-fast"]
+
+litellm_settings:
+  drop_params: true
+  # Langfuse 키를 .env에 넣은 뒤 아래 두 줄의 주석을 해제하면 자동 트레이싱이 켜집니다.
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

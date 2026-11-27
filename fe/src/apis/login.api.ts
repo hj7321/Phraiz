@@ -1,0 +1,56 @@
+import { LoginResponseData, LoginType } from "@/types/auth.type";
+import { api } from "./api";
+import axios from "axios";
+
+// 자체 로그인
+export const selfLogin = async ({
+  id,
+  pw,
+}: LoginType): Promise<LoginResponseData> => {
+  const path = "/members/login";
+
+  try {
+    const response = await api.post<LoginResponseData>(path, {
+      id: id,
+      pwd: pw,
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.data.code) {
+        console.error("[selfLogin] Axios 에러: ", error.response.data.message);
+        throw new Error(error.response.data.message);
+      } else console.error("[selfLogin] Axios 에러: ", error);
+    } else {
+      console.error("[selfLogin] 일반 에러: ", error);
+    }
+    throw error;
+  }
+};
+
+// 소셜 로그인 토큰 발급
+export const requestOAuthToken = async (
+  code: string
+): Promise<LoginResponseData> => {
+  const path = "/oauth/token";
+
+  try {
+    const response = await api.post<LoginResponseData>(path, {
+      code: code,
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.data.code) {
+        console.error(
+          "[requestOAuthToken] Axios 에러: ",
+          error.response.data.message
+        );
+        throw new Error(error.response.data.message);
+      } else console.error("[requestOAuthToken] Axios 에러: ", error);
+    } else {
+      console.error("[requestOAuthToken] 일반 에러: ", error);
+    }
+    throw error;
+  }
+};

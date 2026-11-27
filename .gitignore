@@ -1,0 +1,32 @@
+# Environment variables (API 키 보호)
+.env
+.env.local
+.env.*.local
+fe/.env
+fe/.env.local
+be/.env
+!.env.example
+!.env.langfuse.example
+!fe/.env.example
+
+# Frontend (Next.js)
+fe/node_modules/
+fe/.next/
+fe/out/
+
+# Backend (Gradle / Java)
+be/.gradle/
+be/build/
+be/out/
+
+# Python / Eval
+__pycache__/
+*.pyc
+.venv/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
