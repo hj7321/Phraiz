@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { WORKSPACE_CHANGED_EVENT } from "@/lib/guestSession";
+import { getWorkspaceHeaders } from "@/lib/workspaceApi";
 
 type ItemType = "PARAPHRASE" | "SUMMARY" | "CITATION";
 
@@ -79,12 +81,14 @@ export function HistoryDrawer({
   const [folderId, setFolderId] = useState<number | null>(null);
   const [newFolder, setNewFolder] = useState("");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
+      const headers = getWorkspaceHeaders();
       const [fRes, iRes] = await Promise.all([
-        fetch(`${API_BASE}/api/v2/workspace/folders`),
+        fetch(`${API_BASE}/api/v2/workspace/folders`, { headers }),
         fetch(
           `${API_BASE}/api/v2/workspace/items${folderId ? `?folderId=${folderId}` : ""}`,
+          { headers },
         ),
       ]);
       if (fRes.ok) setFolders((await fRes.json()) as Folder[]);
@@ -92,17 +96,30 @@ export function HistoryDrawer({
     } catch {
       // ignore if backend offline
     }
-  };
+  }, [folderId]);
 
   useEffect(() => {
     if (open) void loadData();
-  }, [open, folderId]);
+  }, [open, loadData]);
+
+  useEffect(() => {
+    const handleWorkspaceChange = () => {
+      setFolderId(null);
+      if (open) void loadData();
+    };
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChange);
+    return () =>
+      window.removeEventListener(
+        WORKSPACE_CHANGED_EVENT,
+        handleWorkspaceChange,
+      );
+  }, [open, loadData]);
 
   const handleAddFolder = async () => {
     if (!newFolder.trim()) return;
     await fetch(`${API_BASE}/api/v2/workspace/folders`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getWorkspaceHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ name: newFolder.trim() }),
     });
     setNewFolder("");
@@ -112,6 +129,7 @@ export function HistoryDrawer({
   const handleDelete = async (id: number) => {
     await fetch(`${API_BASE}/api/v2/workspace/items/${id}`, {
       method: "DELETE",
+      headers: getWorkspaceHeaders(),
     });
     void loadData();
   };
