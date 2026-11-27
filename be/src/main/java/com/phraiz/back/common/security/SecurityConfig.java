@@ -7,6 +7,7 @@ import com.phraiz.back.common.security.oauth.CustomOAuth2SuccessHandler;
 import com.phraiz.back.member.service.CustomOAuth2UserService;
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -25,6 +26,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -37,6 +40,9 @@ public class SecurityConfig {
     private final RedisTemplate<String, String> redisTemplate;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final CustomOAuth2SuccessHandler customOAuth2SuccessHandler;
+
+    @Value("${cors.allowed-origins:}")
+    private String extraCorsOrigins;
 
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
@@ -51,12 +57,19 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration config = new CorsConfiguration();
-                    config.setAllowedOrigins(List.of(
-                        "http://localhost:3000",
-                        "http://localhost:8080",
-                        "https://ssu-phraiz-fe.vercel.app",
-                        "https://www.phraiz.com"
+                    List<String> originPatterns = new ArrayList<>(List.of(
+                            "http://localhost:3000",
+                            "http://localhost:8080",
+                            "https://*.vercel.app",
+                            "https://www.phraiz.com"
                     ));
+                    if (extraCorsOrigins != null && !extraCorsOrigins.isBlank()) {
+                        Arrays.stream(extraCorsOrigins.split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isBlank())
+                                .forEach(originPatterns::add);
+                    }
+                    config.setAllowedOriginPatterns(originPatterns);
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
                     config.setExposedHeaders(List.of("Authorization"));

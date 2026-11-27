@@ -1,0 +1,117 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: phraiz-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-phraiz_root_pw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-phraiz}
+      MYSQL_USER: ${MYSQL_USER:-phraiz_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-phraiz_pw}
+      TZ: Asia/Seoul
+    volumes:
+      - phraiz_mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD:-phraiz_root_pw}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: phraiz-redis
+    restart: unless-stopped
+    volumes:
+      - phraiz_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  translation-server:
+    build:
+      context: ./be/translation-server
+      dockerfile: Dockerfile
+    container_name: phraiz-zotero
+    restart: unless-stopped
+
+  litellm:
+    build:
+      context: ./litellm
+      dockerfile: Dockerfile
+    container_name: phraiz-litellm
+    restart: unless-stopped
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-phraiz-prod-master-key}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+
+  backend:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+    container_name: phraiz-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+      translation-server:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: dev,llm
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-phraiz}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-phraiz_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-phraiz_pw}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      LLM_GATEWAY_BASE_URL: http://litellm:4000/v1
+      LLM_GATEWAY_API_KEY: ${LITELLM_MASTER_KEY:-sk-phraiz-prod-master-key}
+      ZOTERO_URL: http://translation-server:1969/web
+      PHRAIZ_QUOTA_DAILY_IP_LIMIT: ${PHRAIZ_QUOTA_DAILY_IP_LIMIT:-35}
+      PHRAIZ_QUOTA_DAILY_GLOBAL_LIMIT: ${PHRAIZ_QUOTA_DAILY_GLOBAL_LIMIT:-300}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: phraiz-caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - phraiz_caddy_data:/data
+      - phraiz_caddy_config:/config
+
+volumes:
+  phraiz_mysql_data:
+  phraiz_redis_data:
+  phraiz_caddy_data:
+  phraiz_caddy_config:

@@ -7,6 +7,7 @@ import com.phraiz.back.ai.quota.CreditGuardService;
 import com.phraiz.back.ai.quota.PlanTier;
 import com.phraiz.back.ai.service.LlmGatewayService;
 import com.phraiz.back.ai.service.PromptTemplateFactory;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -43,13 +44,13 @@ public class AiStreamController {
 
     @PostMapping(value = "/paraphrase/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamParaphrase(
+            HttpServletRequest httpRequest,
             Principal principal,
             @RequestHeader(value = "X-Member-Id", required = false) String headerMemberId,
             @RequestHeader(value = "X-Plan-Tier", required = false) String headerPlanTier,
             @Valid @RequestBody ParaphraseStreamRequest request
     ) {
         String memberId = resolveMemberId(principal, headerMemberId);
-        // 운영 환경에서는 Member 엔티티의 구독 planId로 PlanTier를 조회합니다.
         PlanTier tier = PlanTier.parseOrDefault(headerPlanTier);
 
         // FREE 티어는 요청 옵션과 무관하게 경량 모델(Haiku 5.5)로 강제 라우팅해 원가 방어
@@ -58,6 +59,7 @@ public class AiStreamController {
                 ? CreditGuardService.COST_PARAPHRASE_FAST
                 : CreditGuardService.COST_PARAPHRASE_PREMIUM;
 
+        creditGuardService.consumeDailyIpCredits(CreditGuardService.extractClientIp(httpRequest), creditCost);
         creditGuardService.consumeCredits(memberId, tier, creditCost);
 
         String modelAlias = useFastModel
@@ -74,6 +76,7 @@ public class AiStreamController {
 
     @PostMapping(value = "/summary/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamSummary(
+            HttpServletRequest httpRequest,
             Principal principal,
             @RequestHeader(value = "X-Member-Id", required = false) String headerMemberId,
             @RequestHeader(value = "X-Plan-Tier", required = false) String headerPlanTier,
@@ -81,6 +84,11 @@ public class AiStreamController {
     ) {
         String memberId = resolveMemberId(principal, headerMemberId);
         PlanTier tier = PlanTier.parseOrDefault(headerPlanTier);
+
+        creditGuardService.consumeDailyIpCredits(
+                CreditGuardService.extractClientIp(httpRequest),
+                CreditGuardService.COST_SUMMARY_TEXT
+        );
         creditGuardService.consumeCredits(memberId, tier, CreditGuardService.COST_SUMMARY_TEXT);
 
         String modelAlias = properties.models().summary();
@@ -94,6 +102,7 @@ public class AiStreamController {
             produces = MediaType.TEXT_EVENT_STREAM_VALUE
     )
     public SseEmitter streamPdfSummary(
+            HttpServletRequest httpRequest,
             Principal principal,
             @RequestHeader(value = "X-Member-Id", required = false) String headerMemberId,
             @RequestHeader(value = "X-Plan-Tier", required = false) String headerPlanTier,
@@ -124,6 +133,10 @@ public class AiStreamController {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "PDF 파일은 최대 20MB까지 지원합니다.");
         }
 
+        creditGuardService.consumeDailyIpCredits(
+                CreditGuardService.extractClientIp(httpRequest),
+                CreditGuardService.COST_SUMMARY_PDF
+        );
         creditGuardService.consumeCredits(memberId, tier, CreditGuardService.COST_SUMMARY_PDF);
 
         String modelAlias = properties.models().summary();
