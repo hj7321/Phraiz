@@ -46,7 +46,7 @@ public class CreditGuardService {
      */
     public void consumeDailyIpCredits(String clientIp, int cost) {
         LocalDate today = LocalDate.now(KST);
-        String ipKey = "phraiz:daily:ip:" + clientIp + ":" + today;
+        String ipKey = buildDailyIpKey(clientIp, today);
         String globalKey = "phraiz:daily:global:" + today;
 
         // 1) IP당 일일 한도 체크
@@ -79,6 +79,31 @@ public class CreditGuardService {
         }
     }
 
+    /**
+     * 현재 방문자 IP의 일일 사용량 / 일일 한도(기본 35)를 조회합니다.
+     */
+    public QuotaStatus getDailyIpQuotaStatus(String clientIp, PlanTier tier) {
+        LocalDate today = LocalDate.now(KST);
+        String raw = redisTemplate.opsForValue().get(buildDailyIpKey(clientIp, today));
+        long used = 0;
+        if (raw != null) {
+            try {
+                used = Long.parseLong(raw);
+            } catch (NumberFormatException ignored) {
+                used = 0;
+            }
+        }
+        return new QuotaStatus(
+                clientIp,
+                tier.name(),
+                used,
+                dailyIpLimit,
+                Math.max(0, dailyIpLimit - used),
+                tier.isPremiumModelAllowed(),
+                tier.isPdfSummaryAllowed()
+        );
+    }
+
     public static String extractClientIp(HttpServletRequest request) {
         if (request == null) return "unknown";
         String xff = request.getHeader("X-Forwarded-For");
@@ -97,13 +122,11 @@ public class CreditGuardService {
         Long updated = redisTemplate.opsForValue().increment(key, cost);
         long used = updated != null ? updated : cost;
 
-        // 최초 생성 시 35일 TTL 설정 (월간 자동 만료)
         if (used == cost) {
             redisTemplate.expire(key, Duration.ofDays(35));
         }
 
         if (used > tier.getMonthlyCreditLimit()) {
-            // 초과분 원자적 롤백
             redisTemplate.opsForValue().decrement(key, cost);
             throw new ResponseStatusException(
                     HttpStatus.TOO_MANY_REQUESTS,
@@ -146,6 +169,10 @@ public class CreditGuardService {
 
     public void resetMonthlyCredits(String memberId) {
         redisTemplate.delete(buildMonthlyKey(memberId));
+    }
+
+    private String buildDailyIpKey(String clientIp, LocalDate today) {
+        return "phraiz:daily:ip:" + clientIp + ":" + today;
     }
 
     private String buildMonthlyKey(String memberId) {

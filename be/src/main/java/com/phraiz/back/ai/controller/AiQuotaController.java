@@ -3,9 +3,8 @@ package com.phraiz.back.ai.controller;
 import com.phraiz.back.ai.quota.CreditGuardService;
 import com.phraiz.back.ai.quota.CreditGuardService.QuotaStatus;
 import com.phraiz.back.ai.quota.PlanTier;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/v2/ai/quota")
@@ -19,30 +18,22 @@ public class AiQuotaController {
 
     @GetMapping
     public QuotaStatus getQuota(
-            Principal principal,
-            @RequestHeader(value = "X-Member-Id", required = false) String headerMemberId,
+            HttpServletRequest httpRequest,
             @RequestHeader(value = "X-Plan-Tier", required = false) String headerPlanTier
     ) {
-        String memberId = resolveMemberId(principal, headerMemberId);
+        String clientIp = CreditGuardService.extractClientIp(httpRequest);
         PlanTier tier = PlanTier.parseOrDefault(headerPlanTier);
-        return creditGuardService.getQuotaStatus(memberId, tier);
+        return creditGuardService.getDailyIpQuotaStatus(clientIp, tier);
     }
 
     @PostMapping("/reset")
-    public QuotaStatus resetForDev(
-            Principal principal,
-            @RequestHeader(value = "X-Member-Id", required = false) String headerMemberId,
+    public QuotaStatus resetBlockedInProd(
+            HttpServletRequest httpRequest,
             @RequestHeader(value = "X-Plan-Tier", required = false) String headerPlanTier
     ) {
-        String memberId = resolveMemberId(principal, headerMemberId);
-        creditGuardService.resetMonthlyCredits(memberId);
-        return creditGuardService.getQuotaStatus(memberId, PlanTier.parseOrDefault(headerPlanTier));
-    }
-
-    private String resolveMemberId(Principal principal, String headerMemberId) {
-        if (principal != null && principal.getName() != null && !principal.getName().isBlank()) {
-            return principal.getName();
-        }
-        return (headerMemberId != null && !headerMemberId.isBlank()) ? headerMemberId : "local-dev";
+        // 운영 공개 환경에서는 일일 IP 한도 우회를 막기 위해 현재 상태만 반환
+        String clientIp = CreditGuardService.extractClientIp(httpRequest);
+        PlanTier tier = PlanTier.parseOrDefault(headerPlanTier);
+        return creditGuardService.getDailyIpQuotaStatus(clientIp, tier);
     }
 }

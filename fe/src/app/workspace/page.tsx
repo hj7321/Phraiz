@@ -7,6 +7,7 @@ import { QuotaStatusBar, type PlanTier } from "@/components/ai/QuotaStatusBar";
 import { LeftPdfSummaryPane } from "@/components/canvas/LeftPdfSummaryPane";
 import { CenterEditorPane } from "@/components/canvas/CenterEditorPane";
 import { RightCitationPane } from "@/components/canvas/RightCitationPane";
+import { getWorkspaceHeaders } from "@/lib/workspaceApi";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -26,7 +27,9 @@ function WorkspaceContent() {
 
   useEffect(() => {
     if (!itemIdParam) return;
-    fetch(`${API_BASE}/api/v2/workspace/items`)
+    fetch(`${API_BASE}/api/v2/workspace/items`, {
+      headers: getWorkspaceHeaders(),
+    })
       .then((r) => (r.ok ? r.json() : []))
       .then(
         (
@@ -83,7 +86,7 @@ function WorkspaceContent() {
     try {
       const res = await fetch(`${API_BASE}/api/v2/workspace/items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getWorkspaceHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           itemType: "PARAPHRASE",
           title: title.trim() || "제목 없는 초안",

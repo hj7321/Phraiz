@@ -1,5 +1,16 @@
+import { getWorkspaceMemberId } from "./guestSession";
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+
+export function getWorkspaceHeaders(
+  extra?: Record<string, string>,
+): Record<string, string> {
+  return {
+    "X-Member-Id": getWorkspaceMemberId(),
+    ...extra,
+  };
+}
 
 export async function saveWorkspaceHistory(params: {
   itemType: "PARAPHRASE" | "SUMMARY" | "CITATION";
@@ -12,7 +23,7 @@ export async function saveWorkspaceHistory(params: {
   try {
     await fetch(`${API_BASE}/api/v2/workspace/items`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getWorkspaceHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(params),
     });
   } catch {
