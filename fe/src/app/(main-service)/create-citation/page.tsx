@@ -1,21 +1,5 @@
-export const runtime = "nodejs";
+import { redirect } from "next/navigation";
 
-import ContentBox from "@/components/box/ContentBox";
-import { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "인용 생성",
-  alternates: { canonical: "/create-citation" },
-  openGraph: {
-    type: "website",
-    locale: "ko_KR",
-    url: "https://www.phraiz.com/create-citation",
-    title: "Phraiz",
-    description: "인용 생성",
-    images: ["/opengraph/create-citation.png"],
-  },
-};
-
-export default function CreateCitationPage() {
-  return <ContentBox />;
+export default function LegacyCitationPage() {
+  redirect("/ai-stream-test?tab=citation");
 }
